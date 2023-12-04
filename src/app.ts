@@ -1,5 +1,6 @@
 import express, { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
+import http2 from 'http2';
 import cardsRouter from './routes/cards';
 import usersRouter from './routes/users';
 
@@ -23,6 +24,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 app.use('/users', usersRouter);
 app.use('/cards', cardsRouter);
+
+app.all('*', (_, res) => {
+  res.status(http2.constants.HTTP_STATUS_NOT_FOUND).send({
+    message: 'Несуществующий адрес запроса',
+  });
+});
 
 app.listen(PORT, () => {
   console.log(`App listening on port ${PORT}`);
