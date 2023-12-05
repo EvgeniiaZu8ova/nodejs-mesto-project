@@ -1,10 +1,16 @@
-import { Request, Response } from 'express';
-import Card from '../models/card';
+import { Request, Response } from "express";
+import http2 from "http2";
+import mongoose from "mongoose";
+import Card from "../models/card";
 
 export const getCards = (req: Request, res: Response) => {
   Card.find({})
     .then((cards) => res.send({ data: cards }))
-    .catch((err) => res.status(500).send({ message: err.message }));
+    .catch((err) =>
+      res
+        .status(http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
+        .send({ message: err.message })
+    );
 };
 
 export const createCard = (req: Request, res: Response) => {
@@ -14,24 +20,39 @@ export const createCard = (req: Request, res: Response) => {
   Card.create({ name, link, owner: req.user._id })
     .then((card) => res.send({ data: card }))
     .catch((err) => {
-      if (err.errors.name.name === 'ValidatorError') {
-        return res.status(400).send({ message: 'Неверный формат отправки данных' });
+      if (err instanceof mongoose.Error.ValidationError) {
+        return res
+          .status(http2.constants.HTTP_STATUS_BAD_REQUEST)
+          .send({ message: "Неверный формат отправки данных" });
       }
 
-      return res.status(500).send({ message: 'Произошла ошибка' });
+      return res
+        .status(http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
+        .send({ message: "Произошла ошибка" });
     });
 };
 
 export const deleteCard = (req: Request, res: Response) => {
   Card.findByIdAndDelete(req.params.cardId)
-    .then((card) => {
-      if (!card) {
-        return res.status(404).send({ message: 'Карточка по указанному _id не найдена' });
+    .orFail()
+    .then(() => res.send({ message: "Карточка была удалена" }))
+    .catch((err) => {
+      if (err instanceof mongoose.Error.CastError) {
+        return res
+          .status(http2.constants.HTTP_STATUS_BAD_REQUEST)
+          .send({ message: "В запросе указан невалидный ID карточки" });
       }
 
-      return res.status(204).send({ message: 'Карточка была удалена' });
-    })
-    .catch(() => res.status(500).send({ message: 'Произошла ошибка' }));
+      if (err instanceof mongoose.Error.DocumentNotFoundError) {
+        return res
+          .status(http2.constants.HTTP_STATUS_NOT_FOUND)
+          .send({ message: "Карточка по указанному _id не найдена" });
+      }
+
+      return res
+        .status(http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
+        .send({ message: "Произошла ошибка" });
+    });
 };
 
 export const putLikeOnCard = (req: Request, res: Response) => {
@@ -39,20 +60,26 @@ export const putLikeOnCard = (req: Request, res: Response) => {
     req.params.cardId,
     // @ts-ignore
     { $addToSet: { likes: req.user._id } },
-    { new: true },
-  ).then((card) => {
-    if (!card) {
-      return res.status(404).send({ message: 'Карточка по указанному _id не найдена' });
-    }
-
-    return res.send({ data: card });
-  })
+    { new: true }
+  )
+    .orFail()
+    .then((card) => res.send({ data: card }))
     .catch((err) => {
-      if (err.errors.name.name === 'ValidatorError') {
-        return res.status(400).send({ message: 'Неверный формат отправки данных' });
+      if (err instanceof mongoose.Error.CastError) {
+        return res
+          .status(http2.constants.HTTP_STATUS_BAD_REQUEST)
+          .send({ message: "В запросе указан невалидный ID карточки" });
       }
 
-      return res.status(500).send({ message: 'Произошла ошибка' });
+      if (err instanceof mongoose.Error.DocumentNotFoundError) {
+        return res
+          .status(http2.constants.HTTP_STATUS_NOT_FOUND)
+          .send({ message: "Карточка по указанному _id не найдена" });
+      }
+
+      return res
+        .status(http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
+        .send({ message: "Произошла ошибка" });
     });
 };
 
@@ -61,19 +88,25 @@ export const removeLikeFromCard = (req: Request, res: Response) => {
     req.params.cardId,
     // @ts-ignore
     { $pull: { likes: req.user._id } },
-    { new: true },
-  ).then((card) => {
-    if (!card) {
-      return res.status(404).send({ message: 'Карточка по указанному _id не найдена' });
-    }
-
-    return res.send({ data: card });
-  })
+    { new: true }
+  )
+    .orFail()
+    .then((card) => res.send({ data: card }))
     .catch((err) => {
-      if (err.errors.name.name === 'ValidatorError') {
-        return res.status(400).send({ message: 'Неверный формат отправки данных' });
+      if (err instanceof mongoose.Error.CastError) {
+        return res
+          .status(http2.constants.HTTP_STATUS_BAD_REQUEST)
+          .send({ message: "В запросе указан невалидный ID карточки" });
       }
 
-      return res.status(500).send({ message: 'Произошла ошибка' });
+      if (err instanceof mongoose.Error.DocumentNotFoundError) {
+        return res
+          .status(http2.constants.HTTP_STATUS_NOT_FOUND)
+          .send({ message: "Карточка по указанному _id не найдена" });
+      }
+
+      return res
+        .status(http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
+        .send({ message: "Произошла ошибка" });
     });
 };
