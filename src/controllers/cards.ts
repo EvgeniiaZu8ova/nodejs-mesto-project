@@ -1,61 +1,69 @@
-import { Request, Response } from "express";
+import { NotFoundError } from "./../errors/not-found-err";
+import { ForbiddenError } from "./../errors/forbidden-err";
+import { BadReqError } from "./../errors/bad-req-err";
+import { NextFunction, Request, Response } from "express";
 import http2 from "http2";
-import mongoose from "mongoose";
-import Card from "../models/card";
+import mongoose, { ObjectId } from "mongoose";
+import Card, { ICard } from "../models/card";
 
-export const getCards = (req: Request, res: Response) => {
+export const getCards = (req: Request, res: Response, next: NextFunction) => {
   Card.find({})
     .then((cards) => res.send({ data: cards }))
-    .catch((err) =>
-      res
-        .status(http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
-        .send({ message: err.message })
-    );
+    .catch(next);
 };
 
-export const createCard = (req: Request, res: Response) => {
+export const createCard = (req: Request, res: Response, next: NextFunction) => {
   const { name, link } = req.body;
 
   // @ts-ignore
   Card.create({ name, link, owner: req.user._id })
     .then((card) => res.send({ data: card }))
     .catch((err) => {
+      let error = err;
+
       if (err instanceof mongoose.Error.ValidationError) {
-        return res
-          .status(http2.constants.HTTP_STATUS_BAD_REQUEST)
-          .send({ message: "Неверный формат отправки данных" });
+        error = new BadReqError("Неверный формат отправки данных");
       }
 
-      return res
-        .status(http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
-        .send({ message: "Произошла ошибка" });
+      next(error);
     });
 };
 
-export const deleteCard = (req: Request, res: Response) => {
-  Card.findByIdAndDelete(req.params.cardId)
+export const deleteCard = (req: Request, res: Response, next: NextFunction) => {
+  const cardId = req.params.cardId;
+
+  Card.findById(cardId)
     .orFail()
-    .then(() => res.send({ message: "Карточка была удалена" }))
+    .then((data: ICard) => {
+      // @ts-ignore
+      if (String(data?.owner) === req.user._id) {
+        Card.deleteOne({ _id: cardId })
+          .orFail()
+          .then(() => res.send({ message: "Карточка была удалена" }));
+      } else {
+        throw new ForbiddenError("Нельзя удалить чужую карточку");
+      }
+    })
     .catch((err) => {
+      let error = err;
+
       if (err instanceof mongoose.Error.CastError) {
-        return res
-          .status(http2.constants.HTTP_STATUS_BAD_REQUEST)
-          .send({ message: "В запросе указан невалидный ID карточки" });
+        error = new BadReqError("В запросе указан невалидный ID карточки");
       }
 
       if (err instanceof mongoose.Error.DocumentNotFoundError) {
-        return res
-          .status(http2.constants.HTTP_STATUS_NOT_FOUND)
-          .send({ message: "Карточка по указанному _id не найдена" });
+        error = new NotFoundError("Карточка по указанному _id не найдена");
       }
 
-      return res
-        .status(http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
-        .send({ message: "Произошла ошибка" });
+      next(error);
     });
 };
 
-export const putLikeOnCard = (req: Request, res: Response) => {
+export const putLikeOnCard = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   Card.findByIdAndUpdate(
     req.params.cardId,
     // @ts-ignore
@@ -65,25 +73,25 @@ export const putLikeOnCard = (req: Request, res: Response) => {
     .orFail()
     .then((card) => res.send({ data: card }))
     .catch((err) => {
+      let error = err;
+
       if (err instanceof mongoose.Error.CastError) {
-        return res
-          .status(http2.constants.HTTP_STATUS_BAD_REQUEST)
-          .send({ message: "В запросе указан невалидный ID карточки" });
+        error = new BadReqError("В запросе указан невалидный ID карточки");
       }
 
       if (err instanceof mongoose.Error.DocumentNotFoundError) {
-        return res
-          .status(http2.constants.HTTP_STATUS_NOT_FOUND)
-          .send({ message: "Карточка по указанному _id не найдена" });
+        error = new NotFoundError("Карточка по указанному _id не найдена");
       }
 
-      return res
-        .status(http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
-        .send({ message: "Произошла ошибка" });
+      next(error);
     });
 };
 
-export const removeLikeFromCard = (req: Request, res: Response) => {
+export const removeLikeFromCard = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   Card.findByIdAndUpdate(
     req.params.cardId,
     // @ts-ignore
@@ -93,20 +101,16 @@ export const removeLikeFromCard = (req: Request, res: Response) => {
     .orFail()
     .then((card) => res.send({ data: card }))
     .catch((err) => {
+      let error = err;
+
       if (err instanceof mongoose.Error.CastError) {
-        return res
-          .status(http2.constants.HTTP_STATUS_BAD_REQUEST)
-          .send({ message: "В запросе указан невалидный ID карточки" });
+        error = new BadReqError("В запросе указан невалидный ID карточки");
       }
 
       if (err instanceof mongoose.Error.DocumentNotFoundError) {
-        return res
-          .status(http2.constants.HTTP_STATUS_NOT_FOUND)
-          .send({ message: "Карточка по указанному _id не найдена" });
+        error = new NotFoundError("Карточка по указанному _id не найдена");
       }
 
-      return res
-        .status(http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
-        .send({ message: "Произошла ошибка" });
+      next(error);
     });
 };
