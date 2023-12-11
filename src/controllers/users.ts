@@ -1,60 +1,75 @@
-import { Request, Response } from "express";
+import { ConflictError } from "./../errors/conflict-err";
+import { NotAuthError } from "./../errors/not-auth-err";
+import { NotFoundError } from "./../errors/not-found-err";
+import { BadReqError } from "./../errors/bad-req-err";
+import { NextFunction, Request, Response } from "express";
 import http2 from "http2";
 import mongoose from "mongoose";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import User from "../models/user";
 
-export const getUsers = (req: Request, res: Response) => {
+export const getUsers = (req: Request, res: Response, next: NextFunction) => {
   User.find({})
     .then((users) => res.send({ data: users }))
-    .catch((err) =>
-      res
-        .status(http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
-        .send({ message: err.message })
-    );
+    .catch(next);
 };
 
-export const getUser = (req: Request, res: Response) => {
-  User.findById(req.params.id)
+const getUserById = (id: string, res: Response, next: NextFunction) => {
+  User.findById(id)
     .orFail()
     .then((user) => res.send({ data: user }))
     .catch((err) => {
+      let error = err;
+
       if (err instanceof mongoose.Error.CastError) {
-        return res
-          .status(http2.constants.HTTP_STATUS_BAD_REQUEST)
-          .send({ message: "В запросе указан невалидный ID пользователя" });
+        error = new BadReqError(
+          `В запросе указан невалидный ID пользователя: ${id}`
+        );
       }
 
       if (err instanceof mongoose.Error.DocumentNotFoundError) {
-        return res
-          .status(http2.constants.HTTP_STATUS_NOT_FOUND)
-          .send({ message: "Пользователь по указанному _id не найден" });
+        error = new NotFoundError("Пользователь по указанному _id не найден");
       }
 
-      return res
-        .status(http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
-        .send({ message: err.message });
+      next(error);
     });
 };
 
-export const createUser = (req: Request, res: Response) => {
-  const { name, about, avatar } = req.body;
+export const getUser = (req: Request, res: Response, next: NextFunction) =>
+  getUserById(req.params.id, res, next);
 
-  User.create({ name, about, avatar })
+export const getCurrentUser = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) =>
+  // @ts-ignore
+  getUserById(req.user._id, res, next);
+
+export const createUser = (req: Request, res: Response, next: NextFunction) => {
+  const { name, about, avatar, email, password } = req.body;
+
+  bcrypt
+    .hash(password, 10)
+    .then((hash) => User.create({ name, about, avatar, email, password: hash }))
     .then((user) => res.send({ data: user }))
     .catch((err) => {
+      let error = err;
+
       if (err instanceof mongoose.Error.ValidationError) {
-        return res
-          .status(http2.constants.HTTP_STATUS_BAD_REQUEST)
-          .send({ message: "Неверный формат отправки данных" });
+        error = new BadReqError("Неверный формат отправки данных");
       }
 
-      return res
-        .status(http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
-        .send({ message: "Произошла ошибка" });
+      if (err.code === 11000) {
+        error = new ConflictError("Такой пользователь уже существует");
+      }
+
+      next(error);
     });
 };
 
-export function updateUser(req: Request, res: Response) {
+export function updateUser(req: Request, res: Response, next: NextFunction) {
   User.findByIdAndUpdate(
     // @ts-ignore
     req.user._id,
@@ -64,26 +79,22 @@ export function updateUser(req: Request, res: Response) {
     .orFail()
     .then((user) => res.send({ data: user }))
     .catch((err) => {
+      let error = err;
+
       if (err instanceof mongoose.Error.ValidationError) {
-        return res
-          .status(http2.constants.HTTP_STATUS_BAD_REQUEST)
-          .send({ message: "Неверный формат отправки данных" });
+        error = new BadReqError("Неверный формат отправки данных");
       }
 
       if (err instanceof mongoose.Error.DocumentNotFoundError) {
-        return res
-          .status(http2.constants.HTTP_STATUS_NOT_FOUND)
-          .send({ message: "Пользователь по указанному _id не найден" });
+        error = new NotFoundError("Пользователь по указанному _id не найден");
       }
 
-      return res
-        .status(http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
-        .send({ message: "Произошла ошибка" });
+      next(error);
     });
 }
 
 export const updateProfile = function (fn: unknown) {
-  return function (req: Request, res: Response) {
+  return function (req: Request, res: Response, next: NextFunction) {
     // @ts-ignore
     return fn(
       {
@@ -93,13 +104,14 @@ export const updateProfile = function (fn: unknown) {
           about: req.body.about,
         },
       },
-      res
+      res,
+      next
     );
   };
 };
 
 export const updateAvatar = function (fn: unknown) {
-  return function (req: Request, res: Response) {
+  return function (req: Request, res: Response, next: NextFunction) {
     // @ts-ignore
     return fn(
       {
@@ -108,7 +120,31 @@ export const updateAvatar = function (fn: unknown) {
           avatar: req.body.avatar,
         },
       },
-      res
+      res,
+      next
     );
   };
+};
+
+export const login = (req: Request, res: Response, next: NextFunction) => {
+  const { email, password } = req.body;
+
+  return User.findUserByCredentials(email, password)
+    .then((user) => {
+      const token = jwt.sign({ _id: user._id }, "some-secret-key", {
+        expiresIn: "7d",
+      });
+
+      res
+        .cookie("jwt", token, {
+          maxAge: 3600000 * 24 * 7,
+          httpOnly: true,
+          sameSite: true,
+        })
+        .end();
+    })
+    .catch((err) => {
+      const error = new NotAuthError("Необходима авторизация");
+      next(error);
+    });
 };
