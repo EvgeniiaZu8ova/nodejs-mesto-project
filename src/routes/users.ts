@@ -1,49 +1,49 @@
-import { celebrate, Joi } from "celebrate";
-import { Router } from "express";
+import { celebrate, Joi } from 'celebrate';
+import { Router } from 'express';
+import { linkRegex } from '../utils';
 import {
   getUsers,
   getUser,
-  updateUser,
   updateProfile,
   updateAvatar,
   getCurrentUser,
-} from "../controllers/users";
+} from '../controllers/users';
 
 const usersRouter = Router();
 
-usersRouter.get("/", getUsers);
+usersRouter.get('/', getUsers);
 
-usersRouter.get("/me", getCurrentUser);
+usersRouter.get('/me', getCurrentUser);
 
 usersRouter.get(
-  "/:id",
+  '/:id',
   celebrate({
     params: Joi.object().keys({
-      id: Joi.string(),
+      id: Joi.string().required().hex(),
     }),
   }),
-  getUser
+  getUser,
 );
 
 usersRouter.patch(
-  "/me",
+  '/me',
   celebrate({
     body: Joi.object().keys({
       name: Joi.string().min(2).max(30),
       about: Joi.string().min(2).max(200),
     }),
   }),
-  updateProfile(updateUser)
+  updateProfile,
 );
 
 usersRouter.patch(
-  "/me/avatar",
+  '/me/avatar',
   celebrate({
     body: Joi.object().keys({
-      avatar: Joi.string(),
+      avatar: Joi.string().pattern(linkRegex),
     }),
   }),
-  updateAvatar(updateUser)
+  updateAvatar,
 );
 
 export default usersRouter;

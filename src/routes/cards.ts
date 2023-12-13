@@ -1,56 +1,57 @@
-import { celebrate, Joi } from "celebrate";
-import { Router } from "express";
+import { celebrate, Joi } from 'celebrate';
+import { Router } from 'express';
+import { linkRegex } from '../utils';
 import {
   getCards,
   createCard,
   deleteCard,
   putLikeOnCard,
   removeLikeFromCard,
-} from "../controllers/cards";
+} from '../controllers/cards';
 
 const cardsRouter = Router();
 
-cardsRouter.get("/", getCards);
+cardsRouter.get('/', getCards);
 
 cardsRouter.post(
-  "/",
+  '/',
   celebrate({
     body: Joi.object().keys({
       name: Joi.string().required().min(2).max(30),
-      link: Joi.string().required(),
+      link: Joi.string().required().pattern(linkRegex),
     }),
   }),
-  createCard
+  createCard,
 );
 
 cardsRouter.delete(
-  "/:cardId",
+  '/:cardId',
   celebrate({
     params: Joi.object().keys({
-      cardId: Joi.string(),
+      cardId: Joi.string().required().hex(),
     }),
   }),
-  deleteCard
+  deleteCard,
 );
 
 cardsRouter.put(
-  "/:cardId/likes",
+  '/:cardId/likes',
   celebrate({
     params: Joi.object().keys({
-      cardId: Joi.string(),
+      cardId: Joi.string().required().hex(),
     }),
   }),
-  putLikeOnCard
+  putLikeOnCard,
 );
 
 cardsRouter.delete(
-  "/:cardId/likes",
+  '/:cardId/likes',
   celebrate({
     params: Joi.object().keys({
-      cardId: Joi.string(),
+      cardId: Joi.string().required().hex(),
     }),
   }),
-  removeLikeFromCard
+  removeLikeFromCard,
 );
 
 export default cardsRouter;

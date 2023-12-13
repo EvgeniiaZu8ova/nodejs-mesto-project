@@ -51,20 +51,26 @@ app.use(router);
 
 app.use(errorLogger);
 
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  const {
-    // @ts-ignore
-    statusCode = http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR,
-    message,
-  } = err;
+app.use(
+  (
+    err: Error & { statusCode: number },
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const {
+      statusCode = http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR,
+      message,
+    } = err;
 
-  res.status(statusCode).send({
-    message:
-      statusCode === http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR
-        ? "На сервере произошла ошибка"
-        : message,
-  });
-});
+    res.status(statusCode).send({
+      message:
+        statusCode === http2.constants.HTTP_STATUS_INTERNAL_SERVER_ERROR
+          ? "На сервере произошла ошибка"
+          : message,
+    });
+  }
+);
 
 app.listen(PORT, () => {
   console.log(`App listening on port ${PORT}`);

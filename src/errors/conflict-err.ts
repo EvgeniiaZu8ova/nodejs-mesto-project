@@ -1,6 +1,6 @@
-import http2 from "http2";
+import http2 from 'http2';
 
-export class ConflictError extends Error {
+export default class ConflictError extends Error {
   statusCode: number;
 
   constructor(message: string) {
