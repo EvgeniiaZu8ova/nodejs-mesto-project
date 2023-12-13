@@ -1,6 +1,6 @@
-import http2 from "http2";
+import http2 from 'http2';
 
-export class BadReqError extends Error {
+export default class BadReqError extends Error {
   statusCode: number;
 
   constructor(message: string) {

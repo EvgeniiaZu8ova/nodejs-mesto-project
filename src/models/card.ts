@@ -1,11 +1,11 @@
-import mongoose from "mongoose";
-import urlValidator from "../utils/urlValidator";
+import mongoose from 'mongoose';
+import urlValidator from '../utils/urlValidator';
 
 export interface ICard {
   name: string;
   link: string;
   owner: mongoose.Schema.Types.ObjectId;
-  likes: [{ type: mongoose.Schema.Types.ObjectId; ref: "user" }];
+  likes: [{ type: mongoose.Schema.Types.ObjectId; ref: 'user' }];
   createdAt: Date;
 }
 
@@ -21,16 +21,16 @@ const cardSchema = new mongoose.Schema<ICard>({
     required: true,
     validate: {
       validator: urlValidator,
-      message: "Необходимо указать ссылку",
+      message: 'Необходимо указать ссылку',
     },
   },
   owner: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "user",
+    ref: 'user',
     required: true,
   },
   likes: {
-    type: [{ type: mongoose.Schema.Types.ObjectId, ref: "user" }],
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'user' }],
     default: [],
   },
   createdAt: {
@@ -39,4 +39,4 @@ const cardSchema = new mongoose.Schema<ICard>({
   },
 });
 
-export default mongoose.model("card", cardSchema);
+export default mongoose.model<ICard>('card', cardSchema);
